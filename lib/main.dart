@@ -1,4 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import 'package:my_app/models/imagemDto.dart';
 
 void main() {
   runApp(MyApp());
@@ -22,7 +28,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blueGrey,
       ),
-      home: MyHomePage(title: 'Hebert Alves Ferreira'),
+      home: MyHomePage(title: 'Pós graduação PUC - Minas'),
     );
   }
 }
@@ -46,44 +52,70 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  List<Widget> images;
 
-  getImages() {
-    int quantidadeImagens = 10;
-    List<Widget> lista = [];
-
-    for (int i = 0; i < quantidadeImagens; i++) {
-      lista.add(Card(
-        semanticContainer: true,
-        clipBehavior: Clip.antiAliasWithSaveLayer,
-        child: Image.network(
-          'https://placeimg.com/640/480/any',
-          fit: BoxFit.fill,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        elevation: 5,
-        margin: EdgeInsets.all(10),
-      ));
-    }
-
-    return lista;
+  void initState() {
+    updateWidget();
   }
 
-  void _incrementCounter() {
+  updateWidget() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      this.images = new List<Widget>();
     });
+    getImages().then((val) => setState(() {
+          this.images = val;
+        }));
+  }
+
+  Future<List<Widget>> getImages() async {
+    var images = '/aws/getImages';
+    var request = await http.post(
+        Uri.https('spring-boot-puc-server.herokuapp.com', 'login'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(
+            <String, String>{'username': 'admin', 'password': '123'}));
+    String token = request.headers[HttpHeaders.authorizationHeader];
+    print(token);
+
+    final response = await http.get(
+        Uri.https('spring-boot-puc-server.herokuapp.com', '/aws/getImages'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        });
+    if (response.statusCode == 200) {
+      var json = jsonDecode(response.body);
+
+      print(images);
+      List<Widget> lista = [];
+
+      for (int i = 0; i < json.length; i++) {
+        lista.add(Card(
+          semanticContainer: true,
+          clipBehavior: Clip.antiAliasWithSaveLayer,
+          child: FadeInImage.assetNetwork(
+              placeholder: 'assets/loading.gif', image: json[i]['src']),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10.0),
+          ),
+          elevation: 5,
+          margin: EdgeInsets.all(10),
+        ));
+      }
+
+      return lista;
+    } else {
+      // If the server did not return a 200 OK response,
+      // then throw an exception.
+      throw Exception('Failed to load album $response.statusCode');
+    }
   }
 
   showAlertDialog(BuildContext context) {
-    // configura o button
+    // configura o buttonthis.images = val;
     Widget okButton = ElevatedButton(
       child: Text("OK"),
       onPressed: () {
@@ -141,27 +173,12 @@ class _MyHomePageState extends State<MyHomePage> {
         padding: const EdgeInsets.all(10),
         child: SingleChildScrollView(
             child: Column(
-          children: [
-            ElevatedButton.icon(
-              onPressed: () => {this.showAlertDialog(context)},
-              icon: Icon(Icons.mark_email_read_outlined),
-              label: Text("Botão Teste"),
-              onLongPress: () => {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar(),
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Você segurou o botão')))
-              },
-              style: ButtonStyle(
-                backgroundColor:
-                    MaterialStateProperty.all<Color>(Colors.blueGrey.shade700),
-              ),
-            ),
-            ...this.getImages(),
-          ],
+          children: this.images,
         )),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: () => {},
+        backgroundColor: Colors.teal,
         tooltip: 'Increment',
         child: Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
